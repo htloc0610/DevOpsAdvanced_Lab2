@@ -111,7 +111,7 @@ In the pipeline configuration:
    - **Repository URL**: `<your-git-repository-url>`
    - **Credentials**: Select Git credentials if private repo
    - **Branch**: `*/main` (or your default branch)
-   - **Script Path**: `Jenkinsfile`
+   - **Script Path**: `pipeline/Jenkinsfile-CI`
 
 4. Click **Save**
 
