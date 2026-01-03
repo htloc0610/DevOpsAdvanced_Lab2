@@ -236,9 +236,17 @@ pipeline {
                     ]
                     
                     try {
+                        // Generate docker-compose.override.yml to use specific tags for affected services
+                        def overrideContent = "services:\n"
+                        services.each { service ->
+                            overrideContent += "  ${service}:\n    image: ${DOCKER_USERNAME}/${service}:${DOCKER_TAG}\n"
+                        }
+                        writeFile file: 'docker-compose.override.yml', text: overrideContent
+                        
                         // Start environment
+                        // TAG=latest ensures unaffected services fallback to latest
                         sh """
-                            export TAG=${DOCKER_TAG}
+                            export TAG=latest
                             export COMPOSE_PROJECT_NAME=${project}
                             docker compose up -d
                         """
@@ -283,6 +291,7 @@ pipeline {
                         sh """
                             export COMPOSE_PROJECT_NAME=${project}
                             docker compose down
+                            rm docker-compose.override.yml || true
                         """
                     }
                 }
