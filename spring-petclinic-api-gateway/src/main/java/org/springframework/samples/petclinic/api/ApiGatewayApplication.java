@@ -56,7 +56,6 @@ public class ApiGatewayApplication {
         return new RestTemplate();
     }
     
-
     @Bean
     @LoadBalanced
     public WebClient.Builder loadBalancedWebClientBuilder() {
