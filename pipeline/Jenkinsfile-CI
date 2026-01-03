@@ -11,7 +11,7 @@ pipeline {
         // Docker Configuration
         DOCKER_USERNAME = credentials('dockerhub-username')
         DOCKER_PASSWORD = credentials('dockerhub-password')
-        DOCKER_TAG = "latest"
+        DOCKER_TAG = "${BUILD_NUMBER}"
         
         // Maven Docker Image
         MAVEN_IMAGE = 'maven:3.9.6-eclipse-temurin-17'
