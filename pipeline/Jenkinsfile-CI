@@ -19,8 +19,11 @@ pipeline {
         // Snyk Docker Image
         SNYK_IMAGE = 'snyk/snyk:maven-3-jdk-17'
         
+        // OWASP ZAP Docker Image
+        ZAP_IMAGE = 'zaproxy/zap-stable'
+        
         // Services list
-        ALL_SERVICES = 'spring-petclinic-api-gateway,spring-petclinic-customers-service,spring-petclinic-vets-service,spring-petclinic-visits-service,spring-petclinic-genai-service,spring-petclinic-config-server,spring-petclinic-discovery-server,spring-petclinic-admin-server'
+        ALL_SERVICES = 'spring-petclinic-api-gateway,spring-petclinic-customers-service,spring-petclinic-vets-service,spring-petclinic-visits-service,spring-petclinic-genai-service,spring-petclinic-config-server,spring-petclinic-discovery-server'
     }
     
     stages {
@@ -190,8 +193,7 @@ pipeline {
                         'spring-petclinic-visits-service': '8082',
                         'spring-petclinic-genai-service': '8084',
                         'spring-petclinic-config-server': '8888',
-                        'spring-petclinic-discovery-server': '8761',
-                        'spring-petclinic-admin-server': '9090'
+                        'spring-petclinic-discovery-server': '8761'
                     ]
                     
                     def services = env.AFFECTED_SERVICES.split(',')
@@ -213,7 +215,79 @@ pipeline {
                 }
             }
         }
-        
+        stage('DAST Scan (Ephemeral)') {
+            when {
+                expression { env.AFFECTED_SERVICES && env.AFFECTED_SERVICES != '' }
+            }
+            steps {
+                echo 'Starting Ephemeral Environment for DAST Scan...'
+                script {
+                    def services = env.AFFECTED_SERVICES.split(',')
+                    def project = "zap-scan-${BUILD_NUMBER}"
+                    def network = "${project}_default"
+                    
+                    // Service Ports Mapping (Internal)
+                    def serviceConfigs = [
+                        'spring-petclinic-api-gateway': '8080',
+                        'spring-petclinic-customers-service': '8081',
+                        'spring-petclinic-vets-service': '8083',
+                        'spring-petclinic-visits-service': '8082',
+                        'spring-petclinic-genai-service': '8084'
+                    ]
+                    
+                    try {
+                        // Start environment
+                        sh """
+                            export TAG=${DOCKER_TAG}
+                            export COMPOSE_PROJECT_NAME=${project}
+                            docker compose up -d
+                        """
+                        
+                        // Wait for Config/Discovery readiness
+                        echo "Waiting for services to startup..."
+                        sleep 30
+                        
+                        // Scan each affected service
+                        services.each { service ->
+                            if (serviceConfigs.containsKey(service)) {
+                                def port = serviceConfigs[service]
+                                echo "Running ZAP Scan for ${service} on port ${port}..."
+                                
+                                // Create report directory
+                                sh "mkdir -p zap-reports"
+                                
+                                sh """
+                                    docker run --rm \
+                                        --network ${network} \
+                                        -v \$(pwd)/zap-reports:/zap/wrk/:rw \
+                                        -t ${ZAP_IMAGE} \
+                                        zap-baseline.py \
+                                        -t http://${service}:${port} \
+                                        -r zap-report-${service}.html \
+                                        -J zap-report-${service}.json || true
+                                """
+                            } else {
+                                echo "Skipping ZAP scan for ${service} (no port mapped or not scannable)"
+                            }
+                        }
+                        
+                        // Archive Reports
+                        archiveArtifacts artifacts: 'zap-reports/*', allowEmptyArchive: true
+                        
+                    } catch (Exception e) {
+                        echo "Error during DAST scan: ${e.message}"
+                        currentBuild.result = 'UNSTABLE'
+                    } finally {
+                        // Teardown
+                        echo "Tearing down Ephemeral Environment..."
+                        sh """
+                            export COMPOSE_PROJECT_NAME=${project}
+                            docker-compose down
+                        """
+                    }
+                }
+            }
+        }
         stage('Push to DockerHub') {
             when {
                 expression { env.AFFECTED_SERVICES && env.AFFECTED_SERVICES != '' }
