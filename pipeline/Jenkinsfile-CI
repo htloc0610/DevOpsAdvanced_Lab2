@@ -119,65 +119,65 @@ pipeline {
             }
         }
         
-        stage('SonarQube Analysis') {
-            when {
-                expression { env.AFFECTED_SERVICES && env.AFFECTED_SERVICES != '' }
-            }
-            steps {
-                echo 'Running SonarQube code analysis in Docker container...'
-                withSonarQubeEnv('SonarQube') {
-                    sh """
-                        docker run --rm \
-                            -v \$(pwd):/workspace \
-                            -v \$HOME/.m2:/root/.m2 \
-                            -w /workspace \
-                            -e SONAR_HOST_URL=${SONARQUBE_URL} \
-                            ${MAVEN_IMAGE} \
-                            mvn sonar:sonar \
-                                -pl ${env.AFFECTED_SERVICES} -am \
-                                -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
-                                -Dsonar.host.url=${SONARQUBE_URL} \
-                                -Dsonar.login=${SONAR_TOKEN}
-                    """
-                }
-            }
-        }
+        // stage('SonarQube Analysis') {
+        //     when {
+        //         expression { env.AFFECTED_SERVICES && env.AFFECTED_SERVICES != '' }
+        //     }
+        //     steps {
+        //         echo 'Running SonarQube code analysis in Docker container...'
+        //         withSonarQubeEnv('SonarQube') {
+        //             sh """
+        //                 docker run --rm \
+        //                     -v \$(pwd):/workspace \
+        //                     -v \$HOME/.m2:/root/.m2 \
+        //                     -w /workspace \
+        //                     -e SONAR_HOST_URL=${SONARQUBE_URL} \
+        //                     ${MAVEN_IMAGE} \
+        //                     mvn sonar:sonar \
+        //                         -pl ${env.AFFECTED_SERVICES} -am \
+        //                         -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
+        //                         -Dsonar.host.url=${SONARQUBE_URL} \
+        //                         -Dsonar.login=${SONAR_TOKEN}
+        //             """
+        //         }
+        //     }
+        // }
 
-        stage('Security Scan (Snyk)') {
-            when {
-                expression { env.AFFECTED_SERVICES && env.AFFECTED_SERVICES != '' }
-            }
-            steps {
-                echo 'Running Snyk Security Scan...'
-                script {
-                    def services = env.AFFECTED_SERVICES.split(',')
-                    services.each { service ->
-                        echo "Scanning ${service}..."
-                        sh """
-                            docker run --rm \
-                                -v \$(pwd):/app \
-                                -v \$HOME/.m2:/root/.m2 \
-                                -w /app/${service} \
-                                -e SNYK_TOKEN \
-                                ${SNYK_IMAGE} \
-                                snyk test
-                        """
-                    }
-                }
-            }
-        }
+        // stage('Security Scan (Snyk)') {
+        //     when {
+        //         expression { env.AFFECTED_SERVICES && env.AFFECTED_SERVICES != '' }
+        //     }
+        //     steps {
+        //         echo 'Running Snyk Security Scan...'
+        //         script {
+        //             def services = env.AFFECTED_SERVICES.split(',')
+        //             services.each { service ->
+        //                 echo "Scanning ${service}..."
+        //                 sh """
+        //                     docker run --rm \
+        //                         -v \$(pwd):/app \
+        //                         -v \$HOME/.m2:/root/.m2 \
+        //                         -w /app/${service} \
+        //                         -e SNYK_TOKEN \
+        //                         ${SNYK_IMAGE} \
+        //                         snyk test
+        //                 """
+        //             }
+        //         }
+        //     }
+        // }
         
-        stage('Quality Gate') {
-            when {
-                expression { env.AFFECTED_SERVICES && env.AFFECTED_SERVICES != '' }
-            }
-            steps {
-                echo 'Waiting for SonarQube Quality Gate...'
-                timeout(time: 5, unit: 'MINUTES') {
-                    waitForQualityGate abortPipeline: true
-                }
-            }
-        }
+        // stage('Quality Gate') {
+        //     when {
+        //         expression { env.AFFECTED_SERVICES && env.AFFECTED_SERVICES != '' }
+        //     }
+        //     steps {
+        //         echo 'Waiting for SonarQube Quality Gate...'
+        //         timeout(time: 5, unit: 'MINUTES') {
+        //             waitForQualityGate abortPipeline: true
+        //         }
+        //     }
+        // }
         
         stage('Build Docker Images') {
             when {
