@@ -133,6 +133,7 @@ pipeline {
                             -e SONAR_HOST_URL=${SONARQUBE_URL} \
                             ${MAVEN_IMAGE} \
                             mvn sonar:sonar \
+                                -pl ${env.AFFECTED_SERVICES} -am \
                                 -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
                                 -Dsonar.host.url=${SONARQUBE_URL} \
                                 -Dsonar.login=${SONAR_TOKEN}
