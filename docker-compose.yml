@@ -113,14 +113,6 @@ services:
     ports:
      - 8080:8080
 
-  tracing-server:
-    image: openzipkin/zipkin
-    container_name: tracing-server
-    deploy:
-      resources:
-        limits:
-          memory: 512M
-    ports:
-     - 9411:9411
+
 
 
