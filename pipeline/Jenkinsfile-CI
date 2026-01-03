@@ -261,8 +261,8 @@ pipeline {
                                 def port = serviceConfigs[service]
                                 echo "Running ZAP Scan for ${service} on port ${port}..."
                                 
-                                // Create report directory
-                                sh "mkdir -p zap-reports"
+                                // Create report directory with write permissions
+                                sh "mkdir -p zap-reports && chmod 777 zap-reports"
                                 
                                 sh """
                                     docker run --rm \
