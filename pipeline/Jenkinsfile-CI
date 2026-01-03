@@ -61,20 +61,14 @@ pipeline {
                     def servicesList = env.ALL_SERVICES.split(',')
                     def affectedServices = []
                     
-                    // Check if pom.xml or root files changed - rebuild all
-                    if (changes.contains('pom.xml') || changes.contains('docker/Dockerfile')) {
-                        echo "Core files changed (pom.xml or Dockerfile) - rebuilding all services"
-                        affectedServices = servicesList
-                    } else {
-                        // Detect affected services based on changed paths
-                        affectedServices = changes.tokenize("\n")
-                            .collect { 
-                                def matcher = (it =~ /^([^\/]+)\//)
-                                matcher ? matcher[0][1] : null 
-                            }
-                            .unique()
-                            .findAll { it in servicesList }
-                    }
+                    // Detect affected services based on changed paths
+                    affectedServices = changes.tokenize("\n")
+                        .collect { 
+                            def matcher = (it =~ /^([^\/]+)\//)
+                            matcher ? matcher[0][1] : null 
+                        }
+                        .unique()
+                        .findAll { it in servicesList }
                     
                     if (affectedServices.isEmpty()) {
                         echo "No service changes detected in PR - skipping build stages"
