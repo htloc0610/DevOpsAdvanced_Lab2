@@ -259,7 +259,8 @@ pipeline {
                         services.each { service ->
                             if (serviceConfigs.containsKey(service)) {
                                 def port = serviceConfigs[service]
-                                echo "Running ZAP Scan for ${service} on port ${port}..."
+                                def hostname = service.replace("spring-petclinic-", "")
+                                echo "Running ZAP Scan for ${service} (host: ${hostname}) on port ${port}..."
                                 
                                 // Create report directory with write permissions
                                 sh "mkdir -p zap-reports && chmod 777 zap-reports"
@@ -271,7 +272,7 @@ pipeline {
                                         -w /zap/wrk \
                                         -t ${ZAP_IMAGE} \
                                         zap-baseline.py \
-                                        -t http://${service}:${port} \
+                                        -t http://${hostname}:${port} \
                                         -r zap-report-${service}.html \
                                         -J zap-report-${service}.json || true
                                 """
