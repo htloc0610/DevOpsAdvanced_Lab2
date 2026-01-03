@@ -11,7 +11,7 @@ pipeline {
         // Docker Configuration
         DOCKER_USERNAME = credentials('dockerhub-username')
         DOCKER_PASSWORD = credentials('dockerhub-password')
-        DOCKER_TAG = "${BUILD_NUMBER}"
+        DOCKER_TAG = "latest"
         
         // Maven Docker Image
         MAVEN_IMAGE = 'maven:3.9.6-eclipse-temurin-17'
@@ -282,7 +282,7 @@ pipeline {
                         echo "Tearing down Ephemeral Environment..."
                         sh """
                             export COMPOSE_PROJECT_NAME=${project}
-                            docker-compose down
+                            docker compose down
                         """
                     }
                 }
