@@ -85,7 +85,22 @@ Navigate to **Manage Jenkins** → **Manage Credentials** → **Global** → **A
 - **ID**: `dockerhub-password`
 - **Description**: DockerHub password or access token
 
-### Step 3: Create Pipeline Job
+### Step 3: Configure Snyk (Optional but Recommended)
+1. **Get Snyk API Token**:
+   - Log in to [snyk.io](https://snyk.io).
+   - Go to **Account Settings** -> **API Token**.
+   - Click to view and copy your token.
+
+2. **Add Credential in Jenkins**:
+   - Go to **Dashboard** -> **Manage Jenkins** -> **Credentials**.
+   - Click **global** -> **Add credentials**.
+   - **Kind**: Secret text
+   - **Secret**: Paste your Snyk API Token
+   - **ID**: `snyk-token`
+   - **Description**: Snyk API Token
+   - Click **Create**.
+
+### Step 4: Create Pipeline Job
 
 1. Go to Jenkins dashboard
 2. Click **New Item**

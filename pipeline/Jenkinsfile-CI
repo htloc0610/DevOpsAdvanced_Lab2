@@ -6,6 +6,7 @@ pipeline {
         SONARQUBE_URL = 'http://35.225.11.231:9000'
         SONAR_PROJECT_KEY = 'spring-petclinic-microservices'
         SONAR_TOKEN = credentials('sonarqube-token')
+        SNYK_TOKEN = credentials('snyk-token')
         
         // Docker Configuration
         DOCKER_USERNAME = credentials('dockerhub-username')
@@ -138,6 +139,30 @@ pipeline {
                                 -Dsonar.host.url=${SONARQUBE_URL} \
                                 -Dsonar.login=${SONAR_TOKEN}
                     """
+                }
+            }
+        }
+
+        stage('Security Scan (Snyk)') {
+            when {
+                expression { env.AFFECTED_SERVICES && env.AFFECTED_SERVICES != '' }
+            }
+            steps {
+                echo 'Running Snyk Security Scan...'
+                script {
+                    def services = env.AFFECTED_SERVICES.split(',')
+                    services.each { service ->
+                        echo "Scanning ${service}..."
+                        sh """
+                            docker run --rm \
+                                -v \$(pwd):/app \
+                                -v \$HOME/.m2:/root/.m2 \
+                                -w /app/${service} \
+                                -e SNYK_TOKEN=${SNYK_TOKEN} \
+                                snyk/snyk:maven-java17 \
+                                snyk test
+                        """
+                    }
                 }
             }
         }
