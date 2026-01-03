@@ -268,11 +268,12 @@ pipeline {
                                     docker run --rm \
                                         --network ${network} \
                                         -v \$(pwd)/zap-reports:/zap/wrk/:rw \
+                                        -w /zap/wrk \
                                         -t ${ZAP_IMAGE} \
                                         zap-baseline.py \
                                         -t http://${service}:${port} \
-                                        -r /zap/wrk/zap-report-${service}.html \
-                                        -J /zap/wrk/zap-report-${service}.json || true
+                                        -r zap-report-${service}.html \
+                                        -J zap-report-${service}.json || true
                                 """
                             } else {
                                 echo "Skipping ZAP scan for ${service} (no port mapped or not scannable)"
