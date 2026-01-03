@@ -16,6 +16,9 @@ pipeline {
         // Maven Docker Image
         MAVEN_IMAGE = 'maven:3.9.6-eclipse-temurin-17'
         
+        // Snyk Docker Image
+        SNYK_IMAGE = 'snyk/snyk:maven-3-jdk-17'
+        
         // Services list
         ALL_SERVICES = 'spring-petclinic-api-gateway,spring-petclinic-customers-service,spring-petclinic-vets-service,spring-petclinic-visits-service,spring-petclinic-genai-service,spring-petclinic-config-server,spring-petclinic-discovery-server,spring-petclinic-admin-server'
     }
@@ -158,8 +161,8 @@ pipeline {
                                 -v \$(pwd):/app \
                                 -v \$HOME/.m2:/root/.m2 \
                                 -w /app/${service} \
-                                -e SNYK_TOKEN=${SNYK_TOKEN} \
-                                snyk/snyk:maven-java17 \
+                                -e SNYK_TOKEN \
+                                ${SNYK_IMAGE} \
                                 snyk test
                         """
                     }
