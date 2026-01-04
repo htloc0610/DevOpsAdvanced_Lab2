@@ -91,7 +91,7 @@ pipeline {
             steps {
                 echo 'Running Gitleaks Security Scan...'
                 sh """
-                    docker run --rm -v \$(pwd):/path ${GITLEAKS_IMAGE} detect --source="/path" -v
+                    docker run --rm -v \$(pwd):/path -w /path ${GITLEAKS_IMAGE} detect --source="/path" --config="/path/gitleaks.toml" -v
                 """
             }
         }
