@@ -1,31 +1,34 @@
 pipeline {
     agent { label 'built-in' }
-    
+
     environment {
         // SonarQube Configuration
         SONARQUBE_URL = 'http://35.225.11.231:9000'
         SONAR_PROJECT_KEY = 'spring-petclinic-microservices'
         SONAR_TOKEN = credentials('sonarqube-token')
         SNYK_TOKEN = credentials('snyk-token')
-        
+
         // Docker Configuration
         DOCKER_USERNAME = credentials('dockerhub-username')
         DOCKER_PASSWORD = credentials('dockerhub-password')
         DOCKER_TAG = "${BUILD_NUMBER}"
-        
+
         // Maven Docker Image
         MAVEN_IMAGE = 'maven:3.9.6-eclipse-temurin-17'
-        
+
         // Snyk Docker Image
         SNYK_IMAGE = 'snyk/snyk:maven-3-jdk-17'
-        
+
         // OWASP ZAP Docker Image
         ZAP_IMAGE = 'zaproxy/zap-stable'
-        
+
+        // Gitleaks Docker Image
+        GITLEAKS_IMAGE = 'zricethezav/gitleaks:latest'
+
         // Services list
         ALL_SERVICES = 'spring-petclinic-api-gateway,spring-petclinic-customers-service,spring-petclinic-vets-service,spring-petclinic-visits-service,spring-petclinic-genai-service,spring-petclinic-config-server,spring-petclinic-discovery-server'
     }
-    
+
     stages {
         stage('Checkout') {
             steps {
@@ -33,23 +36,23 @@ pipeline {
                 checkout scm
             }
         }
-        
+
         stage('Detect Changes') {
             steps {
                 script {
                     def isPR = env.CHANGE_ID != null
-                    
+
                     if (!isPR) {
                         // Regular branch build - always build all services
                         echo "Branch build detected - building all services"
                         env.AFFECTED_SERVICES = env.ALL_SERVICES
                         return
                     }
-                    
+
                     // Pull Request - detect changes
                     echo "PR #${env.CHANGE_ID} detected (target: ${env.CHANGE_TARGET})"
                     echo 'Analyzing changed files...'
-                    
+
                     def changes = ''
                     try {
                         changes = sh(script: "git diff --name-only origin/${env.CHANGE_TARGET}...HEAD", returnStdout: true).trim()
@@ -58,21 +61,21 @@ pipeline {
                         env.AFFECTED_SERVICES = env.ALL_SERVICES
                         return
                     }
-                    
+
                     echo "Files changed:\n${changes}"
-                    
+
                     def servicesList = env.ALL_SERVICES.split(',')
                     def affectedServices = []
-                    
+
                     // Detect affected services based on changed paths
                     affectedServices = changes.tokenize("\n")
-                        .collect { 
+                        .collect {
                             def matcher = (it =~ /^([^\/]+)\//)
-                            matcher ? matcher[0][1] : null 
+                            matcher ? matcher[0][1] : null
                         }
                         .unique()
                         .findAll { it in servicesList }
-                    
+
                     if (affectedServices.isEmpty()) {
                         echo "No service changes detected in PR - skipping build stages"
                         env.AFFECTED_SERVICES = ''
@@ -83,7 +86,16 @@ pipeline {
                 }
             }
         }
-        
+
+        stage('Security Scan (Gitleaks)') {
+            steps {
+                echo 'Running Gitleaks Security Scan...'
+                sh """
+                    docker run --rm -v \$(pwd):/path ${GITLEAKS_IMAGE} detect --source="/path" -v
+                """
+            }
+        }
+
         stage('Build & Test') {
             when {
                 expression { env.AFFECTED_SERVICES && env.AFFECTED_SERVICES != '' }
@@ -92,7 +104,7 @@ pipeline {
                 script {
                     echo 'Building and testing with Maven in Docker container...'
                     def services = env.AFFECTED_SERVICES.split(',')
-                    
+
                     // Build parent pom first if needed
                     sh """
                         docker run --rm \
@@ -102,7 +114,7 @@ pipeline {
                             ${MAVEN_IMAGE} \
                             mvn clean install -N -DskipTests
                     """
-                    
+
                     // Build each affected service
                     services.each { service ->
                         echo "Building and testing ${service}..."
@@ -118,7 +130,7 @@ pipeline {
                 }
             }
         }
-        
+
         stage('SonarQube Analysis') {
             when {
                 expression { env.AFFECTED_SERVICES && env.AFFECTED_SERVICES != '' }
@@ -166,7 +178,7 @@ pipeline {
                 }
             }
         }
-        
+
         stage('Quality Gate') {
             when {
                 expression { env.AFFECTED_SERVICES && env.AFFECTED_SERVICES != '' }
@@ -178,7 +190,7 @@ pipeline {
                 }
             }
         }
-        
+
         stage('Build Docker Images') {
             when {
                 expression { env.AFFECTED_SERVICES && env.AFFECTED_SERVICES != '' }
@@ -195,9 +207,9 @@ pipeline {
                         'spring-petclinic-config-server': '8888',
                         'spring-petclinic-discovery-server': '8761'
                     ]
-                    
+
                     def services = env.AFFECTED_SERVICES.split(',')
-                    
+
                     services.each { service ->
                         def port = serviceConfigs[service]
                         echo "Building Docker image for ${service}..."
@@ -225,7 +237,7 @@ pipeline {
                     def services = env.AFFECTED_SERVICES.split(',')
                     def project = "zap-scan-${BUILD_NUMBER}"
                     def network = "${project}_default"
-                    
+
                     // Service Ports Mapping (Internal)
                     def serviceConfigs = [
                         'spring-petclinic-api-gateway': '8080',
@@ -234,7 +246,7 @@ pipeline {
                         'spring-petclinic-visits-service': '8082',
                         'spring-petclinic-genai-service': '8084'
                     ]
-                    
+
                     try {
                         // Generate docker-compose.override.yml to use specific tags for affected services
                         def overrideContent = "services:\n"
@@ -242,7 +254,7 @@ pipeline {
                             overrideContent += "  ${service}:\n    image: ${DOCKER_USERNAME}/${service}:${DOCKER_TAG}\n"
                         }
                         writeFile file: 'docker-compose.override.yml', text: overrideContent
-                        
+
                         // Start environment
                         // TAG=latest ensures unaffected services fallback to latest
                         sh """
@@ -250,21 +262,21 @@ pipeline {
                             export COMPOSE_PROJECT_NAME=${project}
                             docker compose up -d
                         """
-                        
+
                         // Wait for Config/Discovery readiness
                         echo "Waiting for services to startup..."
                         sleep 30
-                        
+
                         // Scan each affected service
                         services.each { service ->
                             if (serviceConfigs.containsKey(service)) {
                                 def port = serviceConfigs[service]
                                 def hostname = service.replace("spring-petclinic-", "")
                                 echo "Running ZAP Scan for ${service} (host: ${hostname}) on port ${port}..."
-                                
+
                                 // Create report directory with write permissions
                                 sh "mkdir -p zap-reports && chmod 777 zap-reports"
-                                
+
                                 sh """
                                     docker run --rm \
                                         --network ${network} \
@@ -280,10 +292,10 @@ pipeline {
                                 echo "Skipping ZAP scan for ${service} (no port mapped or not scannable)"
                             }
                         }
-                        
+
                         // Archive Reports
                         archiveArtifacts artifacts: 'zap-reports/*', allowEmptyArchive: true
-                        
+
                     } catch (Exception e) {
                         echo "Error during DAST scan: ${e.message}"
                         currentBuild.result = 'UNSTABLE'
@@ -310,9 +322,9 @@ pipeline {
                     sh """
                         echo ${DOCKER_PASSWORD} | docker login -u ${DOCKER_USERNAME} --password-stdin
                     """
-                    
+
                     def services = env.AFFECTED_SERVICES.split(',')
-                    
+
                     services.each { service ->
                         echo "Pushing ${service}..."
                         sh """
@@ -324,7 +336,7 @@ pipeline {
             }
         }
     }
-    
+
     post {
         success {
             script {
